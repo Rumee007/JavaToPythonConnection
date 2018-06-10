@@ -23,9 +23,9 @@ public class JavaToPythonConnection {
 
         logger.info("Main System Starting...");
         // Temperature
-        TemperatureThread temperatureThread = new TemperatureThread();
-        Thread temperatureThreadOne = new Thread(temperatureThread);
-        temperatureThreadOne.start();
+        //TemperatureThread temperatureThread = new TemperatureThread();
+        //Thread temperatureThreadOne = new Thread(temperatureThread);
+        //temperatureThreadOne.start();
         // Light ON/OFF
         AutomaticLightSwitchingThread automaticLightSwitchingThread = new AutomaticLightSwitchingThread();
         Thread automaticLightSwitchingThreadOne = new Thread(automaticLightSwitchingThread);
