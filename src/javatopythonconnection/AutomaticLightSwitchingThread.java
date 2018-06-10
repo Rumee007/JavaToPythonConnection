@@ -23,15 +23,16 @@ public class AutomaticLightSwitchingThread implements Runnable {
 
     private static Connection connection = null;
     private static int count = 0;
+    private static boolean lightStatus = true;
     static Logger logger = Logger.getLogger(AutomaticLightSwitchingThread.class);
 
     @Override
     public void run() {
         try {
-            //connection = createDBConnection();
+            connection = createDBConnection();
             logger.info("run()-AutomaticLightSwitchingThread Running...");
             while (!Thread.currentThread().isInterrupted()) {
-                Thread.sleep(1000);
+                Thread.sleep(2500);
                 getMovementData();
             }
         } catch (Exception ex) {
@@ -52,19 +53,25 @@ public class AutomaticLightSwitchingThread implements Runnable {
             String line = null;
             if ((line = bufferedReader.readLine()) != null) {
                 logger.info("getMovementData()-Get movement data:" + line);
-
                 if (line.equalsIgnoreCase("off")) {
                     count++;
-                    // count 20 = 1 min
-                    if (count >= 20) {
-                        //insertData(line);
-                        logger.info("getMovementData()-Data Insert successfully, Light:OFF, count:" + count);
+                    if (count >= 20) { // count 20 = 1 min
+                        if(lightStatus){
+                            insertData(line);
+                            lightStatus = false;
+                        }
+                        logger.info("getMovementData(OFF)-Data Inserted, Light:" + line + ", count:" + count);
                     } else {
-                        logger.info("getMovementData()-Data Insert failed, Light:ON, count:" + count);
+                        logger.info("getMovementData(OFF)-Data Insert failed, Light:" + line + ", count:" + count);
                     }
                 } else {
                     count = 0;
-                    logger.info("getMovementData()-Data Insert failed, Light:ON, count:" + count);
+                    if (insertData(line)) {
+                        lightStatus = true;
+                        logger.info("getMovementData(ON)-Data Inserted, Light:" + line + ", count:" + count);
+                    } else {
+                        logger.info("getMovementData(ON)-Data Insert failed, Light:" + line + ", count:" + count);
+                    }
                 }
             }
             bufferedReader.close();
@@ -84,8 +91,9 @@ public class AutomaticLightSwitchingThread implements Runnable {
                 connection = createDBConnection();
             }
             Statement statement = connection.createStatement();
-            sqlQuery = "INSERT INTO weather (temperature, currdatetime) VALUES "
-                    + "('" + value + "', '" + currentTimestamp + "')";
+
+            sqlQuery = "UPDATE Movement_Reg SET m_status = '" + value + "', date_time = '" + currentTimestamp + "' "
+                    + "WHERE reg_id = 1";
 
             if (statement.executeUpdate(sqlQuery) > 0) {
                 statement.close();
