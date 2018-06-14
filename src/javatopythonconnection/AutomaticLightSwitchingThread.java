@@ -9,6 +9,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
@@ -23,17 +24,21 @@ public class AutomaticLightSwitchingThread implements Runnable {
 
     private static Connection connection = null;
     private static int count = 0;
-    private static boolean lightStatus = true;
+    private static boolean lightOnStatus = true;
+    private static boolean lightOffStatus = true;
     static Logger logger = Logger.getLogger(AutomaticLightSwitchingThread.class);
 
     @Override
     public void run() {
         try {
+            logger.info("run()-Starting AutomaticLightSwitchingThread...");
             connection = createDBConnection();
-            logger.info("run()-AutomaticLightSwitchingThread Running...");
-            while (!Thread.currentThread().isInterrupted()) {
-                Thread.sleep(2500);
-                getMovementData();
+            //!Thread.currentThread().isInterrupted()
+            while (true) {
+                Thread.sleep(500);
+                //getMovementData();
+                controlLightStatusFromApp();
+
             }
         } catch (Exception ex) {
             logger.error("run()-AutomaticLightSwitchingThread Failed... " + ex);
@@ -53,21 +58,31 @@ public class AutomaticLightSwitchingThread implements Runnable {
             String line = null;
             if ((line = bufferedReader.readLine()) != null) {
                 logger.info("getMovementData()-Get movement data:" + line);
+                logger.info("light lightOffStatus : " + lightOffStatus);
+                logger.info("light lightOnStatus : " + lightOnStatus);
                 if (line.equalsIgnoreCase("off")) {
                     count++;
                     if (count >= 20) { // count 20 = 1 min
-                        if(lightStatus){
+                        if (lightOnStatus) {
                             insertData(line);
-                            lightStatus = false;
+                            lightOff();
+                            lightOnStatus = false;
+                            lightOffStatus = true;
+                            logger.info("getMovementData(OFF)-Data Inserted, Light:" + line + ", count:" + count);
+                        } else {
+                            logger.info("getMovementData(OFF)-Data already Inserted, Light:" + line + ", count:" + count);
                         }
-                        logger.info("getMovementData(OFF)-Data Inserted, Light:" + line + ", count:" + count);
                     } else {
                         logger.info("getMovementData(OFF)-Data Insert failed, Light:" + line + ", count:" + count);
                     }
                 } else {
                     count = 0;
+                    if (lightOffStatus) {
+                        lightOn();
+                        lightOnStatus = true;
+                        lightOffStatus = false;
+                    }
                     if (insertData(line)) {
-                        lightStatus = true;
                         logger.info("getMovementData(ON)-Data Inserted, Light:" + line + ", count:" + count);
                     } else {
                         logger.info("getMovementData(ON)-Data Insert failed, Light:" + line + ", count:" + count);
@@ -82,7 +97,37 @@ public class AutomaticLightSwitchingThread implements Runnable {
         }
     }
 
-    private static boolean insertData(String value) throws SQLException {
+    private static void controlLightStatusFromApp() throws SQLException {
+        String sqlSelectQuery, a_status = null;
+        try {
+            if (connection.isClosed()) {
+                //connection.isClosed() || connection == null
+                logger.warn("controlLightStatusFromApp()-Connection closed:" + connection);
+                connection = createDBConnection();
+            }
+            sqlSelectQuery = "SELECT a_status FROM Movement_Reg WHERE reg_id = 1";
+            Statement statement = connection.createStatement();
+            ResultSet resultSet = statement.executeQuery(sqlSelectQuery);
+            while (resultSet.next()) {
+                a_status = resultSet.getString(1);
+                if (a_status.equalsIgnoreCase("on")) {
+                    lightOn();
+                } else {
+                    lightOff();
+                }
+                logger.info("controlLightStatusFromApp()-Get a_status from DB:" + resultSet.getString(1));
+            }
+            statement.close();
+            connection.close();
+            logger.info("controlLightStatusFromApp()-connection.isClosed():" + connection.isClosed());
+        } catch (Exception ex) {
+            connection.close();
+            logger.error("controlLightStatusFromApp()-Inserted failed:" + ex + ", Connection:" + connection);
+        }
+
+    }
+
+    private synchronized static boolean insertData(String value) throws SQLException {
         String sqlQuery = null;
         try {
             Timestamp currentTimestamp = new java.sql.Timestamp(Calendar.getInstance().getTime().getTime());
@@ -109,10 +154,61 @@ public class AutomaticLightSwitchingThread implements Runnable {
         return false;
     }
 
+    private static void lightOn() {
+        if (lightOffStatus) {
+            String path = "/home/pi/Desktop/LightOn.py";
+            String command[] = {"python", path};
+            ProcessBuilder builder = new ProcessBuilder(command);
+            logger.info("lightOn()-System is running...");
+            lightOnStatus = true;
+            lightOffStatus = false;
+            Process process = null;
+            try {
+                process = builder.start();
+                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                String line = null;
+                if ((line = bufferedReader.readLine()) != null) {
+                    logger.info("lightOn()-Get light status :" + line);
+                }
+                bufferedReader.close();
+                process.destroy();
+            } catch (Exception ex) {
+                logger.error("lightOn()-Exception found");
+            }
+        } else {
+            logger.info("lightOn()-Light already ON");
+        }
+    }
+
+    private static void lightOff() {
+        if (lightOnStatus) {
+            String path = "/home/pi/Desktop/LightOff.py";
+            String command[] = {"python", path};
+            ProcessBuilder builder = new ProcessBuilder(command);
+            logger.info("lightOff()-System is running...");
+            lightOnStatus = false;
+            lightOffStatus = true;
+            Process process = null;
+            try {
+                process = builder.start();
+                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                String line = null;
+                if ((line = bufferedReader.readLine()) != null) {
+                    logger.info("lightOff()-Get light status :" + line);
+                }
+                bufferedReader.close();
+                process.destroy();
+            } catch (Exception ex) {
+                logger.error("lightOff()-Exception found");
+            }
+        }
+    }
+
     private static Connection createDBConnection() {
         boolean connectionStatus = false;
         while (!connectionStatus) {
             try {
+            logger.info("createDBConnection()-Get DB connection");
                 connection = (Connection) DriverManager.getConnection(
                         "jdbc:sqlserver://etenderdb.database.windows.net:1433;database=IOTPOC;user=etenderAdmin@etenderdb;password=Eraetender1@;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30");
 
