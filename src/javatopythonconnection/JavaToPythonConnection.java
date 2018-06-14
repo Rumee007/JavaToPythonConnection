@@ -22,10 +22,11 @@ public class JavaToPythonConnection {
         PropertyConfigurator.configure(log4jConfigFile);
 
         logger.info("Main System Starting...");
+        System.out.println("javatopythonconnection.JavaToPythonConnection.main()");
         // Temperature
-        //TemperatureThread temperatureThread = new TemperatureThread();
-        //Thread temperatureThreadOne = new Thread(temperatureThread);
-        //temperatureThreadOne.start();
+//        TemperatureThread temperatureThread = new TemperatureThread();
+//        Thread temperatureThreadOne = new Thread(temperatureThread);
+//        temperatureThreadOne.start();
         // Light ON/OFF
         AutomaticLightSwitchingThread automaticLightSwitchingThread = new AutomaticLightSwitchingThread();
         Thread automaticLightSwitchingThreadOne = new Thread(automaticLightSwitchingThread);
