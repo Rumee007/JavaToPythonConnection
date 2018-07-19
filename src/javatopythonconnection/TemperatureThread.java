@@ -22,6 +22,7 @@ import org.apache.log4j.Logger;
 public class TemperatureThread implements Runnable {
 
     private static Connection connection = null;
+    private static int tempCount = 0;
     static Logger logger = Logger.getLogger(TemperatureThread.class);
 
     @Override
@@ -30,7 +31,7 @@ public class TemperatureThread implements Runnable {
             connection = createDBConnection();
             logger.info("run()-temperatureThread Running...");
             while (!Thread.currentThread().isInterrupted()) {
-                Thread.sleep(1000);
+                Thread.sleep(10000);
                 getTemperature();
             }
 
@@ -44,7 +45,8 @@ public class TemperatureThread implements Runnable {
         String path = "/home/pi/Desktop/temperature.py";
         String command[] = {"python", path};
         ProcessBuilder builder = new ProcessBuilder(command);
-        System.out.println("getTemperature()-System is running...");
+        System.out.println("getTemperature()-System is running :" + tempCount);
+        tempCount++;
         Process process = null;
         try {
             process = builder.start();
@@ -52,6 +54,7 @@ public class TemperatureThread implements Runnable {
             String line = null;
             if ((line = bufferedReader.readLine()) != null) {
                 logger.info("getTemperature()-Get temperature data:"+ line);
+                System.out.println("getTemperature()-Get temperature data:"+ line);
                 if (line.equalsIgnoreCase("ERROR")) {
                     line = "0.00";
                 }
